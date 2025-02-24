@@ -1,10 +1,13 @@
 name: .NET
 
 on:
+  
+  workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ '*' ]
+
   pull_request:
-    branches: [ main ]
+    branches: [ '*' ]
 
 jobs:
   build:
@@ -15,14 +18,14 @@ jobs:
         working-directory: ./AmiiboGameList
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: 5.0.x
-    - name: Restore dependencies
-      run: dotnet restore
+    - uses: actions/checkout@v4
+
     - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      uses: ./.github/actions/build
+      id: build
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AmiiboGameList
+        path: ${{ steps.build.outputs.path }}

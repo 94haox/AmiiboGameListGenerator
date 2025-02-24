@@ -12,6 +12,11 @@ namespace AmiiboGameList;
 public class Program
 {
     /// <summary>
+    /// A shared HttpClient instance to be used throughout the program.
+    /// </summary>
+    public static HttpClient client = new();
+
+    /// <summary>
     /// The lazy instance of the AmiiboDataBase
     /// </summary>
     private static readonly Lazy<DBRootobjectInstance> lazy = new(() => new DBRootobjectInstance());
@@ -23,11 +28,65 @@ public class Program
     /// The instance of the AmiiboDataBase.
     /// </value>
     public static DBRootobjectInstance BRootobject => lazy.Value;
-
-    private static readonly HttpClient client = new();
     private static string inputPath;
-    private static string outputPath = @".\games_info.json";
+    private static string outputPath = @"games_info.json";
+    private static int parallelism = 4;
     private static readonly Dictionary<Hex, Games> export = new();
+
+    public static async Task<string> GetAmiilifeStringAsync(string url, int attempts = 5)
+    {
+        var handleError = new Func<int, string, Task<bool>>(async (attempt, message) =>
+        {
+            Debugger.Log(message, Debugger.DebugLevel.Error);
+
+            if (attempt >= (attempts - 1))
+            {
+                return true;
+            }
+
+            var delay = (attempt + 1) * 5000;
+            Debugger.Log($"Retrying in {delay / 1000} seconds", Debugger.DebugLevel.Verbose);
+            await Task.Delay(delay);
+
+            return false;
+        });
+
+        // Attempt to load the html up to 5 times when encountering a WebException
+        for (int i = 0; i < attempts; i++)
+        {
+            try
+            {
+                return await client.GetStringAsync(url);
+            }
+            catch (WebException ex)
+            {
+                if (handleError(i, $"({i + 1}/{attempts}) Error while loading {url}\n{ex.Message}").Result)
+                {
+                    throw;
+                }
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                if (handleError(i, $"({i + 1}/{attempts}) Timeout error while loading {url}\n{ex.Message}").Result)
+                {
+                    throw;
+                }
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode.HasValue && (int)ex.StatusCode > 499 && (int)ex.StatusCode < 600)
+            {
+                if (handleError(i, $"({i + 1}/{attempts}) HTTP {(int)ex.StatusCode} error while loading {url}\n{ex.Message}").Result)
+                {
+                    throw;
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        throw new Exception("Error occurred in Program.GetAmiilifeStringAsync.  This should never be reached.");
+    }
 
     /// <summary>
     /// Mains this instance.
@@ -51,7 +110,7 @@ public class Program
                 Debugger.Log("Downloading amiibo database", Debugger.DebugLevel.Verbose);
                 try
                 {
-                    amiiboJSON = client.GetStringAsync("https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/database/amiibo.json").Result;
+                    amiiboJSON = Program.client.GetStringAsync("https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/database/amiibo.json").Result;
                 }
                 catch (Exception e)
                 {
@@ -99,7 +158,7 @@ public class Program
             try
             {
                 Debugger.Log("Downloading 3DS database", Debugger.DebugLevel.Verbose);
-                DSDatabase = client.GetByteArrayAsync("http://3dsdb.com/xml.php").Result;
+                DSDatabase = Program.client.GetByteArrayAsync("http://3dsdb.com/xml.php").Result;
             }
             catch (Exception ex)
             {
@@ -127,7 +186,7 @@ public class Program
             Debugger.Log("Downloading Switch database", Debugger.DebugLevel.Verbose);
             try
             {
-                BlawarDatabase = client.GetStringAsync("https://raw.githubusercontent.com/blawar/titledb/master/US.en.json").Result;
+                BlawarDatabase = Program.client.GetStringAsync("https://raw.githubusercontent.com/blawar/titledb/master/US.en.json").Result;
             }
             catch (Exception ex)
             {
@@ -149,7 +208,6 @@ public class Program
             Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
         }
 
-        client.Dispose();
         Debugger.Log("Done loading!");
 
         // List to keep track of missing games
@@ -161,7 +219,10 @@ public class Program
 
         Debugger.Log("Processing amiibo");
         // Iterate over all amiibo and get game info
-        _ = Parallel.ForEach(BRootobject.rootobject.amiibos, (DBamiibo) =>
+        _ = Parallel.ForEach(BRootobject.rootobject.amiibos, new ParallelOptions()
+        {
+            MaxDegreeOfParallelism = parallelism
+        }, (DBamiibo) =>
         {
             Games exportAmiibo = default;
             try
@@ -179,7 +240,10 @@ public class Program
                 Environment.Exit((int)Debugger.ReturnType.UnknownError);
             }
 
-            export.Add(DBamiibo.Key, exportAmiibo);
+            lock (export)
+            {
+                export.Add(DBamiibo.Key, exportAmiibo);
+            }
 
             // Show which amiibo just got added
             AmiiboCounter++;
@@ -187,13 +251,10 @@ public class Program
         });
 
         // Sort export object
-        Hex[] KeyArray = export.Keys.ToArray();
-        Array.Sort(KeyArray);
-        AmiiboKeyValue SortedAmiibos = new();
-        foreach (Hex key in KeyArray)
+        var SortedAmiibos = new AmiiboKeyValue
         {
-            SortedAmiibos.amiibos.Add(key, export[key]);
-        }
+            amiibos = export.OrderBy(kvp => kvp.Key).ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+        };
 
         // Write the SortedAmiibos to file as an tab-indented json
         File.WriteAllText(outputPath, JsonConvert.SerializeObject(SortedAmiibos, Formatting.Indented).Replace("  ", "\t"));
@@ -214,7 +275,7 @@ public class Program
         }
         else
         {
-            return (int)Debugger.ReturnType.Success;
+            return 0;
         }
     }
 
@@ -223,11 +284,12 @@ public class Program
         Games ExAmiibo = new();
 
         HtmlDocument htmlDoc = new();
+
         htmlDoc.LoadHtml(
             WebUtility.HtmlDecode(
-                client.GetStringAsync(DBamiibo.URL).Result
-                )
-            );
+                Program.GetAmiilifeStringAsync(DBamiibo.URL).Result
+            )
+        );
 
         // Get the games panel
         HtmlNodeCollection GamesPanel = htmlDoc.DocumentNode.SelectNodes("//*[@class='games panel']/a");
@@ -237,7 +299,7 @@ public class Program
         }
 
         // Iterate over each game in the games panel
-        _ = Parallel.ForEach(GamesPanel, node =>
+        foreach (HtmlNode node in GamesPanel)
         {
             // Get the name of the game
             Game game = new()
@@ -257,6 +319,9 @@ public class Program
                 });
             }
 
+            // Sort amiiboUsage alphabetically by Usage
+            game.amiiboUsage.Sort((x, y) => string.Compare(x.Usage, y.Usage, StringComparison.OrdinalIgnoreCase));
+
             if (DBamiibo.Name == "Shadow Mewtwo")
             {
                 game.gameName = "Pokkén Tournament";
@@ -270,7 +335,6 @@ public class Program
                     try
                     {
                         game.gameID = Games.SwitchGames[game.sanatizedGameName.ToLower()].ToList();
-                        HtmlDocument htmlDoc = new();
 
                         if (game.gameID.Count == 0)
                         {
@@ -278,20 +342,28 @@ public class Program
                             {
                                 "Cyber Shadow" => new() { "0100C1F0141AA000" },
                                 "Jikkyou Powerful Pro Baseball" => new() { "0100E9C00BF28000" },
-                                "Super Kirby Clash" => new() { "01003FB00C5A8000" },
+                                "Shovel Knight Pocket Dungeon" => new() { "01006B00126EC000" },
                                 "Shovel Knight Showdown" => new() { "0100B380022AE000" },
+                                "Super Kirby Clash" => new() { "01003FB00C5A8000" },
+                                "The Legend of Zelda: Echoes of Wisdom" => new() { "01008CF01BAAC000" },
                                 "The Legend of Zelda: Skyward Sword HD" => new() { "01002DA013484000" },
                                 "Yu-Gi-Oh! Rush Duel Saikyo Battle Royale" => new() { "01003C101454A000" },
                                 _ => throw new Exception()
                             };
                         }
 
-                        game.gameID = game.gameID.Distinct().ToList();
-                        ExAmiibo.gamesSwitch.Add(game);
+                        game.gameID = game.gameID.Order().Distinct().ToList();
+                        lock (ExAmiibo.gamesSwitch)
+                        {
+                            ExAmiibo.gamesSwitch.Add(game);
+                        }
                     }
                     catch
                     {
-                        Games.missingGames.Add(game.gameName + " (Switch)");
+                        lock (Games.missingGames)
+                        {
+                            Games.missingGames.Add(game.gameName + " (Switch)");
+                        }
                     }
 
                     break;
@@ -315,12 +387,19 @@ public class Program
                             }
                         }
 
-                        game.gameID = game.gameID.Distinct().ToList();
-                        ExAmiibo.gamesWiiU.Add(game);
+                        game.gameID = game.gameID.Order().Distinct().ToList();
+
+                        lock (ExAmiibo.gamesWiiU)
+                        {
+                            ExAmiibo.gamesWiiU.Add(game);
+                        }
                     }
                     catch
                     {
-                        Games.missingGames.Add(game.gameName + " (Wii U)");
+                        lock (Games.missingGames)
+                        {
+                            Games.missingGames.Add(game.gameName + " (Wii U)");
+                        }
                     }
 
                     break;
@@ -348,24 +427,31 @@ public class Program
                         games.ForEach(DSGame =>
                             game.gameID.Add(DSGame.titleid[..16]));
 
-                        game.gameID = game.gameID.Distinct().ToList();
-                        ExAmiibo.games3DS.Add(game);
+                        game.gameID = game.gameID.Order().Distinct().ToList();
+
+                        lock (ExAmiibo.games3DS)
+                        {
+                            ExAmiibo.games3DS.Add(game);
+                        }
                     }
                     catch
                     {
-                        Games.missingGames.Add(game.gameName + " (3DS)");
+                        lock (Games.missingGames)
+                        {
+                            Games.missingGames.Add(game.gameName + " (3DS)");
+                        }
                     }
 
                     break;
                 default:
                     break;
             }
-        });
+        }
 
         // Sort all gamelists
-        ExAmiibo.gamesSwitch.Sort();
-        ExAmiibo.gamesWiiU.Sort();
-        ExAmiibo.games3DS.Sort();
+        ExAmiibo.gamesSwitch.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
+        ExAmiibo.gamesWiiU.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
+        ExAmiibo.games3DS.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
 
         // Return the created amiibo
         return ExAmiibo;
@@ -384,6 +470,7 @@ public class Program
                 _ = sB.AppendLine("Usage:");
                 _ = sB.AppendLine("-i | -input {filepath} to specify input json location");
                 _ = sB.AppendLine("-o | -output {filepath} to specify output json location");
+                _ = sB.AppendLine("-p | -parallelism {value} to specify the max degree of parallelism");
                 _ = sB.AppendLine("-l | -log {value} to set the logging level, can pick from verbose, info, warn, error or from 0 to 3 respectively");
                 _ = sB.AppendLine("-h | -help to show this message");
                 Debugger.Log(sB.ToString());
@@ -422,6 +509,11 @@ public class Program
                     {
                         throw new DirectoryNotFoundException($"Input directory '{args[i + 1]}' not found");
                     }
+                case "-p":
+                case "-parallelism":
+                    parallelism = int.Parse(args[i + 1]);
+                    continue;
+
                 case "-l":
                 case "-log":
                     if (Enum.TryParse(args[i + 1], true, out Debugger.DebugLevel debugLevel) && Enum.IsDefined(typeof(Debugger.DebugLevel), debugLevel))

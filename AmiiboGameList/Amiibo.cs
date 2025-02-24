@@ -75,9 +75,9 @@ public class DBAmiibo
                 HtmlDocument AmiiboLookup = new();
                 AmiiboLookup.LoadHtml(
                     WebUtility.HtmlDecode(
-                        new HttpClient().GetStringAsync("https://amiibo.life/search?q=" + characterName).Result
-                        )
-                    );
+                        Program.GetAmiilifeStringAsync("https://amiibo.life/search?q=" + characterName).Result
+                    )
+                );
 
                 // Filter for card amiibo only and get url
                 foreach (HtmlNode item in AmiiboLookup.DocumentNode.SelectNodes("//ul[@class='figures-cards small-block-grid-2 medium-block-grid-4 large-block-grid-4']/li"))
@@ -167,12 +167,13 @@ public class DBAmiibo
 
             return AmiiboSeries switch
             {
-                "Super Mario Bros." => "Super Mario",
-                "Monster Hunter" => "Monster Hunter Stories",
-                "Legend Of Zelda" => "The Legend Of Zelda",
-                "Skylanders" => "Skylanders Superchargers",
                 "8-bit Mario" => "Super Mario Bros 30th Anniversary",
+                "Legend Of Zelda" => "The Legend Of Zelda",
+                "Monster Hunter" => "Monster Hunter Stories",
                 "Monster Sunter Stories Rise" => "Monster Hunter Rise",
+                "Skylanders" => "Skylanders Superchargers",
+                "Super Mario Bros." => "Super Mario",
+                "Xenoblade Chronicles 3" => "Xenoblade Chronicles",
                 "Yu-Gi-Oh!" => "Yu-Gi-Oh! Rush Duel Saikyo Battle Royale",
                 _ => AmiiboSeries,
             };
