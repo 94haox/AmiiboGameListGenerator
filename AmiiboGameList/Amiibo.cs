@@ -50,6 +50,8 @@ public class DBAmiibo
                 "E.M.M.I." => "E M M I",
                 "Tatsuhisa “Luke” Kamijō" => "Tatsuhisa Luke kamijo",
                 "Gakuto Sōgetsu" => "Gakuto Sogetsu",
+                "E.Honda" => "E Honda",
+                "A.K.I" => "A K I",
                 _ => OriginalName
             };
 
@@ -109,7 +111,10 @@ public class DBAmiibo
                         GameSeriesURL = Regex.Replace(GameSeriesURL, @"[!.]", "");
                         GameSeriesURL = Regex.Replace(GameSeriesURL, @"[' ]", "-");
 
-                        url = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
+                        if (GameSeriesURL == "street-fighter-6")
+                            GameSeriesURL = "street-fighter-6-starter-set";
+
+						url = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
 
                         // Handle cat in getter for name
                         if (url.EndsWith("cat"))
