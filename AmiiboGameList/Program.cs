@@ -400,6 +400,7 @@ public class Program
 
                     break;
                 case "switch2":
+                    Debugger.Log("switch2 game name: " + game.sanatizedGameName, Debugger.DebugLevel.Verbose);
                     try
                     {
                         game.gameID = Games.Switch2Games[game.sanatizedGameName.ToLower()].ToList();
