@@ -316,7 +316,7 @@ public class Program
         Games ExAmiibo = new();
 
         HtmlDocument htmlDoc = new();
-
+        Debugger.Log("URL: " + Program.GetAmiilifeStringAsync(DBamiibo.URL).Result);
         htmlDoc.LoadHtml(
             WebUtility.HtmlDecode(
                 Program.GetAmiilifeStringAsync(DBamiibo.URL).Result
