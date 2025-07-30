@@ -208,6 +208,38 @@ public class Program
             Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
         }
 
+        // Load Switch2 games
+        Debugger.Log("Loading Switch2 games");
+        try
+        {
+            string Switch2Database = default;
+            // Try loading the database
+            Debugger.Log("Downloading Switch2 database", Debugger.DebugLevel.Verbose);
+            try
+            {
+                // 注意：这里使用的是示例URL，实际使用时需要替换为真实的Switch2游戏数据库URL
+                Switch2Database = Program.client.GetStringAsync("https://raw.githubusercontent.com/blawar/titledb/master/US.en.json").Result;
+            }
+            catch (Exception ex)
+            {
+                Debugger.Log("Error while downloading Switch2 database, please check internet:\n" + ex.Message, Debugger.DebugLevel.Error);
+                Environment.Exit((int)Debugger.ReturnType.InternetError);
+            }
+
+            Debugger.Log("Processing Switch2 database", Debugger.DebugLevel.Verbose);
+            // Parse the loaded JSON
+            Games.Switch2Games = (Lookup<string, string>)JsonConvert.DeserializeObject<Dictionary<Hex, Switch2Game>>(Switch2Database)
+                // Make KeyValuePairs to turn into a Lookup and decode the HTML encoded name
+                .Select(x => new KeyValuePair<string, string>(HttpUtility.HtmlDecode(x.Value.name), x.Value.id)).Where(y => y.Value != null)
+                // Convert to Lookup for faster searching while allowing multiple values per key and apply regex
+                .ToLookup(x => rx.Replace(x.Key, "").Replace('’', '\'').ToLower(), x => x.Value);
+        }
+        catch (Exception ex)
+        {
+            Debugger.Log("Error loading Switch2 games:\n" + ex.Message, Debugger.DebugLevel.Error);
+            Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
+        }
+
         Debugger.Log("Done loading!");
 
         // List to keep track of missing games
@@ -367,6 +399,35 @@ public class Program
                     }
 
                     break;
+                case "switch2":
+                    try
+                    {
+                        game.gameID = Games.Switch2Games[game.sanatizedGameName.ToLower()].ToList();
+
+                        if (game.gameID.Count == 0)
+                        {
+                            game.gameID = game.sanatizedGameName switch
+                            {
+                                // 这里可以添加Switch2特定的游戏ID映射
+                                _ => throw new Exception()
+                            };
+                        }
+
+                        game.gameID = game.gameID.Order().Distinct().ToList();
+                        lock (ExAmiibo.gamesSwitch2)
+                        {
+                            ExAmiibo.gamesSwitch2.Add(game);
+                        }
+                    }
+                    catch
+                    {
+                        lock (Games.missingGames)
+                        {
+                            Games.missingGames.Add(game.gameName + " (Switch2)");
+                        }
+                    }
+
+                    break;
                 case "wii u":
                     try
                     {
@@ -450,6 +511,7 @@ public class Program
 
         // Sort all gamelists
         ExAmiibo.gamesSwitch.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
+        ExAmiibo.gamesSwitch2.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
         ExAmiibo.gamesWiiU.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
         ExAmiibo.games3DS.Sort((x, y) => string.Compare(x.gameName, y.gameName, StringComparison.OrdinalIgnoreCase));
 

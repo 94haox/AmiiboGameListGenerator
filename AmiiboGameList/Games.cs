@@ -13,6 +13,8 @@ public class Games
     [JsonIgnore]
     internal static Lookup<string, string> SwitchGames;
     [JsonIgnore]
+    internal static Lookup<string, string> Switch2Games;
+    [JsonIgnore]
     internal static List<string> missingGames;
 
     /// <summary>Initializes a new instance of the <see cref="Games" /> class.</summary>
@@ -21,6 +23,7 @@ public class Games
         games3DS = new();
         gamesWiiU = new();
         gamesSwitch = new();
+        gamesSwitch2 = new();
     }
 
     /// <summary>Gets or sets the games3DS.</summary>
@@ -32,6 +35,9 @@ public class Games
     /// <summary>Gets or sets the gamesSwitch.</summary>
     /// <value>The gamesSwitch.</value>
     public List<Game> gamesSwitch { get; set; }
+    /// <summary>Gets or sets the gamesSwitch2.</summary>
+    /// <value>The gamesSwitch2.</value>
+    public List<Game> gamesSwitch2 { get; set; }
 }
 /// <summary>Class to hold all data for individual game data.</summary>
 public class Game : IComparable<Game>
