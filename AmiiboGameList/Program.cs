@@ -208,31 +208,13 @@ public class Program
             Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
         }
 
-        // Load Switch2 games
+        // Load Switch2 games - using same database as Switch since they share the same game library
         Debugger.Log("Loading Switch2 games");
         try
         {
-            string Switch2Database = default;
-            // Try loading the database
-            Debugger.Log("Downloading Switch2 database", Debugger.DebugLevel.Verbose);
-            try
-            {
-                // 注意：这里使用的是示例URL，实际使用时需要替换为真实的Switch2游戏数据库URL
-                Switch2Database = Program.client.GetStringAsync("https://raw.githubusercontent.com/blawar/titledb/master/US.en.json").Result;
-            }
-            catch (Exception ex)
-            {
-                Debugger.Log("Error while downloading Switch2 database, please check internet:\n" + ex.Message, Debugger.DebugLevel.Error);
-                Environment.Exit((int)Debugger.ReturnType.InternetError);
-            }
-
-            Debugger.Log("Processing Switch2 database", Debugger.DebugLevel.Verbose);
-            // Parse the loaded JSON
-            Games.Switch2Games = (Lookup<string, string>)JsonConvert.DeserializeObject<Dictionary<Hex, Switch2Game>>(Switch2Database)
-                // Make KeyValuePairs to turn into a Lookup and decode the HTML encoded name
-                .Select(x => new KeyValuePair<string, string>(HttpUtility.HtmlDecode(x.Value.name), x.Value.id)).Where(y => y.Value != null)
-                // Convert to Lookup for faster searching while allowing multiple values per key and apply regex
-                .ToLookup(x => rx.Replace(x.Key, "").Replace('’', '\'').ToLower(), x => x.Value);
+            // Switch2 uses the same game database as Switch, platform determined by HTML tags
+            Debugger.Log("Switch2 shares database with Switch, reusing Switch database", Debugger.DebugLevel.Verbose);
+            Games.Switch2Games = Games.SwitchGames;
         }
         catch (Exception ex)
         {
