@@ -381,6 +381,7 @@ public class Program
                             game.gameID = game.sanatizedGameName switch
                             {
                                 // 这里可以添加Switch2特定的游戏ID映射
+                                 "Donkey Kong Bananza" => new() { "70010000096809" },
                                 _ => throw new Exception()
                             };
                         }
