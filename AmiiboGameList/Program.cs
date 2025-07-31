@@ -178,7 +178,7 @@ public class Program
         }
 
         // Load Switch games
-        Debugger.Log("Loading Switch games");
+        Debugger.Log("Loading Switch/switch2 games");
         try
         {
             string BlawarDatabase = default;
@@ -201,24 +201,15 @@ public class Program
                 .Select(x => new KeyValuePair<string, string>(HttpUtility.HtmlDecode(x.Value.name), x.Value.id)).Where(y => y.Value != null)
                 // Convert to Lookup for faster searching while allowing multiple values per key and apply regex
                 .ToLookup(x => rx.Replace(x.Key, "").Replace('’', '\'').ToLower(), x => x.Value);
+            Games.Switch2Games = (Lookup<string, string>)JsonConvert.DeserializeObject<Dictionary<Hex, Switch2Game>>(BlawarDatabase)
+                // Make KeyValuePairs to turn into a Lookup and decode the HTML encoded name
+                .Select(x => new KeyValuePair<string, string>(HttpUtility.HtmlDecode(x.Value.name), x.Value.id)).Where(y => y.Value != null)
+                // Convert to Lookup for faster searching while allowing multiple values per key and apply regex
+                .ToLookup(x => rx.Replace(x.Key, "").Replace('’', '\'').ToLower(), x => x.Value);
         }
         catch (Exception ex)
         {
             Debugger.Log("Error loading Switch games:\n" + ex.Message, Debugger.DebugLevel.Error);
-            Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
-        }
-
-        // Load Switch2 games - using same database as Switch since they share the same game library
-        Debugger.Log("Loading Switch2 games");
-        try
-        {
-            // Switch2 uses the same game database as Switch, platform determined by HTML tags
-            Debugger.Log("Switch2 shares database with Switch, reusing Switch database", Debugger.DebugLevel.Verbose);
-            Games.Switch2Games = Games.SwitchGames;
-        }
-        catch (Exception ex)
-        {
-            Debugger.Log("Error loading Switch2 games:\n" + ex.Message, Debugger.DebugLevel.Error);
             Environment.Exit((int)Debugger.ReturnType.DatabaseLoadingError);
         }
 
@@ -381,7 +372,6 @@ public class Program
 
                     break;
                 case "switch 2":
-                    Debugger.Log("switch2 game name: " + game.sanatizedGameName, Debugger.DebugLevel.Verbose);
                     try
                     {
                         game.gameID = Games.Switch2Games[game.sanatizedGameName.ToLower()].ToList();
