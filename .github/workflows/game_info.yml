@@ -67,7 +67,8 @@ jobs:
   games_info:
     name: Get Game Info
     runs-on: ubuntu-latest
-
+    continue-on-error: true
+    
     steps:
     - uses: actions/checkout@v4
       with:
