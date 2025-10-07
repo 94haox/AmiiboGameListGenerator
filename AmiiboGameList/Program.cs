@@ -88,7 +88,7 @@ public class Program
             catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
                 // 404 错误直接抛出，不重试
-                throw;
+                throw new HttpRequestException($"404 Not Found: {url}", ex, HttpStatusCode.NotFound);
             }
             catch (Exception)
             {
@@ -244,6 +244,12 @@ public class Program
             try
             {
                 exportAmiibo = ParseAmiibo(DBamiibo.Value);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // 404 错误已经被 ParseAmiibo 处理，这里不需要额外处理
+                Debugger.Log($"404 Not Found: Skipping {DBamiibo.Value.Name} ({DBamiibo.Value.OriginalName}) - URL: {DBamiibo.Value.URL}", Debugger.DebugLevel.Warn);
+                exportAmiibo = new Games(); // 返回空的 Games 对象
             }
             catch (WebException ex)
             {
