@@ -57,12 +57,20 @@ public class Program
             try
             {
                 using var response = await client.GetAsync(url);
+                
+                // 404 错误直接抛出，不重试
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
                     throw new HttpRequestException($"404 Not Found: {url}", null, response.StatusCode);
                 }
+                
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // 404 错误直接抛出，不重试
+                throw;
             }
             catch (WebException ex)
             {
@@ -84,11 +92,6 @@ public class Program
                 {
                     throw;
                 }
-            }
-            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-            {
-                // 404 错误直接抛出，不重试
-                throw new HttpRequestException($"404 Not Found: {url}", ex, HttpStatusCode.NotFound);
             }
             catch (Exception)
             {
@@ -245,9 +248,15 @@ public class Program
             {
                 exportAmiibo = ParseAmiibo(DBamiibo.Value);
             }
+            catch (AggregateException ex) when (ex.InnerException is HttpRequestException httpEx && httpEx.StatusCode == HttpStatusCode.NotFound)
+            {
+                // 404 错误（包装在 AggregateException 中）
+                Debugger.Log($"404 Not Found: Skipping {DBamiibo.Value.Name} ({DBamiibo.Value.OriginalName}) - URL: {DBamiibo.Value.URL}", Debugger.DebugLevel.Warn);
+                exportAmiibo = new Games(); // 返回空的 Games 对象
+            }
             catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                // 404 错误已经被 ParseAmiibo 处理，这里不需要额外处理
+                // 404 错误
                 Debugger.Log($"404 Not Found: Skipping {DBamiibo.Value.Name} ({DBamiibo.Value.OriginalName}) - URL: {DBamiibo.Value.URL}", Debugger.DebugLevel.Warn);
                 exportAmiibo = new Games(); // 返回空的 Games 对象
             }
@@ -314,6 +323,12 @@ public class Program
                 )
             );
         }
+        catch (AggregateException ex) when (ex.InnerException is HttpRequestException httpEx && httpEx.StatusCode == HttpStatusCode.NotFound)
+        {
+            // 如果是 404 错误（包装在 AggregateException 中），记录日志并返回空的 Games 对象
+            Debugger.Log($"404 Not Found: Skipping {DBamiibo.Name} ({DBamiibo.OriginalName}) - URL: {DBamiibo.URL}", Debugger.DebugLevel.Warn);
+            return ExAmiibo;
+        }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             // 如果是 404 错误，记录日志并返回空的 Games 对象
@@ -323,9 +338,10 @@ public class Program
 
         // Get the games panel
         HtmlNodeCollection GamesPanel = htmlDoc.DocumentNode.SelectNodes("//*[@class='games panel']/a");
-        if (GamesPanel.Count == 0)
+        if (GamesPanel == null || GamesPanel.Count == 0)
         {
             Debugger.Log("No games found for " + DBamiibo.Name, Debugger.DebugLevel.Verbose);
+            return ExAmiibo;
         }
 
         // Iterate over each game in the games panel

@@ -73,25 +73,42 @@ public class DBAmiibo
             // If the amiibo is an animal crossing card, look name up on site and get the first link
             if (type == "Card" && amiiboSeries == "Animal Crossing")
             {
-                // Look amiibo up
-                HtmlDocument AmiiboLookup = new();
-                AmiiboLookup.LoadHtml(
-                    WebUtility.HtmlDecode(
-                        Program.GetAmiilifeStringAsync("https://amiibo.life/search?q=" + characterName).Result
-                    )
-                );
-
-                // Filter for card amiibo only and get url
-                foreach (HtmlNode item in AmiiboLookup.DocumentNode.SelectNodes("//ul[@class='figures-cards small-block-grid-2 medium-block-grid-4 large-block-grid-4']/li"))
+                try
                 {
-                    if (item.ChildNodes[1].GetAttributeValue("href", string.Empty).Contains("cards"))
-                    {
-                        url = "https://amiibo.life" + item.ChildNodes[1].GetAttributeValue("href", string.Empty);
-                        break;
-                    }
-                }
+                    // Look amiibo up
+                    HtmlDocument AmiiboLookup = new();
+                    AmiiboLookup.LoadHtml(
+                        WebUtility.HtmlDecode(
+                            Program.GetAmiilifeStringAsync("https://amiibo.life/search?q=" + characterName).Result
+                        )
+                    );
 
-                return url;
+                    // Filter for card amiibo only and get url
+                    foreach (HtmlNode item in AmiiboLookup.DocumentNode.SelectNodes("//ul[@class='figures-cards small-block-grid-2 medium-block-grid-4 large-block-grid-4']/li"))
+                    {
+                        if (item.ChildNodes[1].GetAttributeValue("href", string.Empty).Contains("cards"))
+                        {
+                            url = "https://amiibo.life" + item.ChildNodes[1].GetAttributeValue("href", string.Empty);
+                            break;
+                        }
+                    }
+
+                    return url;
+                }
+                catch (AggregateException ex) when (ex.InnerException is System.Net.Http.HttpRequestException httpEx && httpEx.StatusCode == HttpStatusCode.NotFound)
+                {
+                    // 404 错误：搜索页面不存在，使用默认 URL 格式
+                    Debugger.Log($"404 Not Found when searching for Animal Crossing card: {characterName}", Debugger.DebugLevel.Warn);
+                    // 返回一个基于角色名的默认 URL
+                    return $"https://amiibo.life/amiibo/animal-crossing/{characterName.Replace(" ", "-").ToLower()}";
+                }
+                catch (System.Net.Http.HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    // 404 错误：搜索页面不存在，使用默认 URL 格式
+                    Debugger.Log($"404 Not Found when searching for Animal Crossing card: {characterName}", Debugger.DebugLevel.Warn);
+                    // 返回一个基于角色名的默认 URL
+                    return $"https://amiibo.life/amiibo/animal-crossing/{characterName.Replace(" ", "-").ToLower()}";
+                }
             }
             else
             {
@@ -114,7 +131,7 @@ public class DBAmiibo
                         if (GameSeriesURL == "street-fighter-6")
                             GameSeriesURL = "street-fighter-6-starter-set";
 
-						url = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
+					url = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
 
                         // Handle cat in getter for name
                         if (url.EndsWith("cat"))
