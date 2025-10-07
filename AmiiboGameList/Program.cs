@@ -56,7 +56,13 @@ public class Program
         {
             try
             {
-                return await client.GetStringAsync(url);
+                using var response = await client.GetAsync(url);
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    throw new HttpRequestException($"404 Not Found: {url}", null, response.StatusCode);
+                }
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsStringAsync();
             }
             catch (WebException ex)
             {
@@ -78,6 +84,11 @@ public class Program
                 {
                     throw;
                 }
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // 404 错误直接抛出，不重试
+                throw;
             }
             catch (Exception)
             {
@@ -289,11 +300,20 @@ public class Program
         Games ExAmiibo = new();
 
         HtmlDocument htmlDoc = new();
-        htmlDoc.LoadHtml(
-            WebUtility.HtmlDecode(
-                Program.GetAmiilifeStringAsync(DBamiibo.URL).Result
-            )
-        );
+        try
+        {
+            htmlDoc.LoadHtml(
+                WebUtility.HtmlDecode(
+                    Program.GetAmiilifeStringAsync(DBamiibo.URL).Result
+                )
+            );
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // 如果是 404 错误，记录日志并返回空的 Games 对象
+            Debugger.Log($"404 Not Found: Skipping {DBamiibo.Name} ({DBamiibo.OriginalName}) - URL: {DBamiibo.URL}", Debugger.DebugLevel.Warn);
+            return ExAmiibo;
+        }
 
         // Get the games panel
         HtmlNodeCollection GamesPanel = htmlDoc.DocumentNode.SelectNodes("//*[@class='games panel']/a");
