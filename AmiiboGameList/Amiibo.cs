@@ -52,6 +52,8 @@ public class DBAmiibo
                 "Gakuto Sōgetsu" => "Gakuto Sogetsu",
                 "E.Honda" => "E Honda",
                 "A.K.I" => "A K I",
+                "Bandana Waddle Dee (Kirby Air Riders)" => "Bandana Waddle Dee Warp Star",
+                "Kirby (Kirby Air Riders)" => "Kirby Warp Star",
                 _ => OriginalName
             };
 
