@@ -86,7 +86,7 @@ public class Program
                     throw;
                 }
             }
-            catch (HttpRequestException ex) when (ex.StatusCode.HasValue && (int)ex.StatusCode > 499 && (int)ex.StatusCode < 600)
+            catch (HttpRequestException ex) when (ex.StatusCode.HasValue && ((int)ex.StatusCode > 499 && (int)ex.StatusCode < 600 || (int)ex.StatusCode == 429))
             {
                 if (handleError(i, $"({i + 1}/{attempts}) HTTP {(int)ex.StatusCode} error while loading {url}\n{ex.Message}").Result)
                 {
