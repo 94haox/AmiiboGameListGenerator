@@ -273,7 +273,7 @@ public class Program
 
         Debugger.Log("Processing amiibo");
         // Iterate over all amiibo and get game info
-        _ = Parallel.ForEach(BRootobject.rootobject.amiibos, new ParallelOptions()
+        _ = Parallel.ForEach(BRootobject.rootobject.amiibos.Reverse(), new ParallelOptions()
         {
             MaxDegreeOfParallelism = parallelism
         }, (DBamiibo) =>
