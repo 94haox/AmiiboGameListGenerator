@@ -118,13 +118,9 @@ public class DBAmiibo
                 GameSeriesURL = Regex.Replace(GameSeriesURL, @"[!.]", "");
                 GameSeriesURL = Regex.Replace(GameSeriesURL, @"[' ]", "-");
 
-                if (GameSeriesURL == "kirby air riders" && Name.ToLower().Contains("kirby"))
+                if (GameSeriesURL == "kirby-air-riders" && Name.ToLower().Contains("kirby"))
                 {
                     finalUrl = "https://amiibo.life/amiibo/kirby-air-riders/kirby-warp-star";
-                }
-                else if (GameSeriesURL == "kirby air riders" && Name.ToLower().Contains("bandana waddle dee"))
-                {
-                    finalUrl = "https://amiibo.life/amiibo/kirby-air-riders/bandana-waddle-dee-winged-star";
                 }
                 else
                 {
@@ -153,7 +149,7 @@ public class DBAmiibo
                     }
                 }
 
-                Debugger.Log($"GameSeriesURL: {GameSeriesURL}, Name: {Name}, URL: {finalUrl}", Debugger.DebugLevel.Verbose);
+                // Debugger.Log($"GameSeriesURL: {GameSeriesURL}, Name: {Name}, URL: {finalUrl}", Debugger.DebugLevel.Verbose);
                 return finalUrl;
             }
         });
