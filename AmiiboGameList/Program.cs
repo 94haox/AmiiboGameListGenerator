@@ -459,6 +459,7 @@ public class Program
                             {
                                 // 这里可以添加Switch2特定的游戏ID映射
                                  "Donkey Kong Bananza" => new() { "70010000096809" },
+                                 "Kirby Air Riders" => new() { "70010000103775" },
                                 _ => throw new Exception()
                             };
                         }
