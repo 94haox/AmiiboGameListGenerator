@@ -113,42 +113,48 @@ public class DBAmiibo
             }
             else
             {
+                string finalUrl;
                 string GameSeriesURL = amiiboSeries.ToLower();
                 GameSeriesURL = Regex.Replace(GameSeriesURL, @"[!.]", "");
                 GameSeriesURL = Regex.Replace(GameSeriesURL, @"[' ]", "-");
 
                 if (GameSeriesURL == "kirby air riders" && Name.ToLower().Contains("kirby"))
                 {
-                    return "https://amiibo.life/amiibo/kirby-air-riders/kirby-warp-star";
+                    finalUrl = "https://amiibo.life/amiibo/kirby-air-riders/kirby-warp-star";
                 }
-
-                if (GameSeriesURL == "kirby air riders" && Name.ToLower().Contains("bandana waddle dee"))
+                else if (GameSeriesURL == "kirby air riders" && Name.ToLower().Contains("bandana waddle dee"))
                 {
-                    return "https://amiibo.life/amiibo/kirby-air-riders/bandana-waddle-dee-winged-star";
+                    finalUrl = "https://amiibo.life/amiibo/kirby-air-riders/bandana-waddle-dee-winged-star";
                 }
-
-                switch (Name.ToLower())
+                else
                 {
-                    case "super mario cereal":
-                        return "https://amiibo.life/amiibo/super-mario-cereal/super-mario-cereal";
+                    switch (Name.ToLower())
+                    {
+                        case "super mario cereal":
+                            finalUrl = "https://amiibo.life/amiibo/super-mario-cereal/super-mario-cereal";
+                            break;
 
-                    case "solaire of astora":
-                        return "https://amiibo.life/amiibo/dark-souls/solaire-of-astora";
+                        case "solaire of astora":
+                            finalUrl = "https://amiibo.life/amiibo/dark-souls/solaire-of-astora";
+                            break;
 
-                    default:
-                        if (GameSeriesURL == "street-fighter-6")
-                            GameSeriesURL = "street-fighter-6-starter-set";
+                        default:
+                            if (GameSeriesURL == "street-fighter-6")
+                                GameSeriesURL = "street-fighter-6-starter-set";
 
-                        url = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
+                            finalUrl = $"https://amiibo.life/amiibo/{GameSeriesURL}/{Name.Replace(" ", "-").ToLower()}";
 
-                        // Handle cat in getter for name
-                        if (url.EndsWith("cat"))
-                        {
-                            url = url.Insert(url.LastIndexOf('/') + 1, "cat-")[..url.Length];
-                        }
-
-                        return url;
+                            // Handle cat in getter for name
+                            if (finalUrl.EndsWith("cat"))
+                            {
+                                finalUrl = finalUrl.Insert(finalUrl.LastIndexOf('/') + 1, "cat-")[..finalUrl.Length];
+                            }
+                            break;
+                    }
                 }
+
+                Debugger.Log($"GameSeriesURL: {GameSeriesURL}, Name: {Name}, URL: {finalUrl}", Debugger.DebugLevel.Verbose);
+                return finalUrl;
             }
         });
     }
