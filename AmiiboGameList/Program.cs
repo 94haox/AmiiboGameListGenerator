@@ -33,9 +33,9 @@ public class Program
     private static int parallelism = 4;
     private static readonly Dictionary<Hex, Games> export = new();
 
-    public static async Task<string> GetAmiilifeStringAsync(string url, int attempts = 5)
+    public static async Task<string> GetAmiilifeStringAsync(string url, int attempts = 10)
     {
-        var handleError = new Func<int, string, Task<bool>>(async (attempt, message) =>
+        var handleError = new Func<int, string, int?, Task<bool>>(async (attempt, message, waitSeconds) =>
         {
             Debugger.Log(message, Debugger.DebugLevel.Error);
 
@@ -44,62 +44,97 @@ public class Program
                 return true;
             }
 
-            var delay = (attempt + 1) * 5000;
+            // Default delay: exponential backoff or 5s * attempt if no waitSeconds provided
+            var delay = waitSeconds.HasValue 
+                ? waitSeconds.Value * 1000 
+                : (int)Math.Pow(2, attempt) * 1000 + 1000; // Exponential: 2s, 3s, 5s...
+
+            // Cap delay to 1 minute to avoid waiting too long if something is weird
+            if (!waitSeconds.HasValue && delay > 60000) delay = 60000;
+
             Debugger.Log($"Retrying in {delay / 1000} seconds", Debugger.DebugLevel.Verbose);
             await Task.Delay(delay);
 
             return false;
         });
 
-        // Attempt to load the html up to 5 times when encountering a WebException
         for (int i = 0; i < attempts; i++)
         {
             try
             {
                 using var response = await client.GetAsync(url);
                 
-                // 404 错误直接抛出，不重试
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    throw new HttpRequestException($"404 Not Found: {url}", null, response.StatusCode);
+                     throw new HttpRequestException($"404 Not Found: {url}", null, response.StatusCode);
                 }
-                
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadAsStringAsync();
+                }
+
+                if ((int)response.StatusCode == 429)
+                {
+                    int? retryAfterSeconds = null;
+                    if (response.Headers.RetryAfter != null)
+                    {
+                        if (response.Headers.RetryAfter.Delta.HasValue)
+                        {
+                            retryAfterSeconds = (int)response.Headers.RetryAfter.Delta.Value.TotalSeconds + 1;
+                        }
+                        else if (response.Headers.RetryAfter.Date.HasValue)
+                        {
+                            retryAfterSeconds = (int)(response.Headers.RetryAfter.Date.Value - DateTime.UtcNow).TotalSeconds + 1;
+                        }
+                    }
+
+                    if (await handleError(i, $"({i + 1}/{attempts}) HTTP 429 (Too Many Requests) while loading {url}", retryAfterSeconds))
+                    {
+                         response.EnsureSuccessStatusCode(); 
+                    }
+                    continue; 
+                }
+
+                if ((int)response.StatusCode > 499)
+                {
+                     if (await handleError(i, $"({i + 1}/{attempts}) HTTP {(int)response.StatusCode} error while loading {url}", null))
+                     {
+                         response.EnsureSuccessStatusCode();
+                     }
+                     continue;
+                }
+
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
             }
             catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                // 404 错误直接抛出，不重试
                 throw;
             }
-            catch (WebException ex)
+            catch (HttpRequestException ex)
             {
-                if (handleError(i, $"({i + 1}/{attempts}) Error while loading {url}\n{ex.Message}").Result)
+                if (await handleError(i, $"({i + 1}/{attempts}) HTTP Request error while loading {url}\n{ex.Message}", null))
                 {
                     throw;
                 }
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
             {
-                if (handleError(i, $"({i + 1}/{attempts}) Timeout error while loading {url}\n{ex.Message}").Result)
+                if (await handleError(i, $"({i + 1}/{attempts}) Timeout error while loading {url}\n{ex.Message}", null))
                 {
                     throw;
                 }
             }
-            catch (HttpRequestException ex) when (ex.StatusCode.HasValue && ((int)ex.StatusCode > 499 && (int)ex.StatusCode < 600 || (int)ex.StatusCode == 429))
+            catch (Exception ex)
             {
-                if (handleError(i, $"({i + 1}/{attempts}) HTTP {(int)ex.StatusCode} error while loading {url}\n{ex.Message}").Result)
+                if (await handleError(i, $"({i + 1}/{attempts}) Unexpected error while loading {url}\n{ex.Message}", null))
                 {
                     throw;
                 }
-            }
-            catch (Exception)
-            {
-                throw;
             }
         }
 
-        throw new Exception("Error occurred in Program.GetAmiilifeStringAsync.  This should never be reached.");
+        throw new Exception("Error occurred in Program.GetAmiilifeStringAsync. Retries exhausted.");
     }
 
     /// <summary>
