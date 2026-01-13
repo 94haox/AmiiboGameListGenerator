@@ -31,6 +31,7 @@ public class Program
     private static string inputPath;
     private static string outputPath = @"games_info.json";
     private static int parallelism = 4;
+    private static bool allowMissingGames;
     private static readonly Dictionary<Hex, Games> export = new();
 
     public static async Task<string> GetAmiilifeStringAsync(string url, int attempts = 10)
@@ -337,6 +338,11 @@ public class Program
                 Debugger.Log("\t" + Game, Debugger.DebugLevel.Warn);
             }
 
+            if (allowMissingGames)
+            {
+                return 0;
+            }
+
             return (int)Debugger.ReturnType.SuccessWithErrors;
         }
         else
@@ -585,6 +591,7 @@ public class Program
                 _ = sB.AppendLine("-o | -output {filepath} to specify output json location");
                 _ = sB.AppendLine("-p | -parallelism {value} to specify the max degree of parallelism");
                 _ = sB.AppendLine("-l | -log {value} to set the logging level, can pick from verbose, info, warn, error or from 0 to 3 respectively");
+                _ = sB.AppendLine("-allow-missing to return 0 even if some games are missing titleids");
                 _ = sB.AppendLine("-h | -help to show this message");
                 Debugger.Log(sB.ToString());
                 Environment.Exit(0);
@@ -640,6 +647,9 @@ public class Program
                     {
                         throw new ArgumentException($"Incorrect debug level passed: {args[i + 1]}");
                     }
+                case "-allow-missing":
+                    allowMissingGames = true;
+                    continue;
                 default:
                     break;
             }
