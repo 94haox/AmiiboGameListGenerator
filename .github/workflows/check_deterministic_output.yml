@@ -49,7 +49,7 @@ jobs:
     - name: Fetch the data
       uses: ./.github/actions/build-and-run
       with:
-        arguments: -log 0 -o ./games_info.json
+        arguments: -log 0 -o ./games_info.json -allow-missing
 
     - name: Upload result
       uses: actions/upload-artifact@v4

@@ -78,7 +78,7 @@ jobs:
     - name: Build and run
       uses: ./.github/actions/build-and-run
       with:
-        arguments: -log "${{ inputs.log }}" -p "${{ inputs.parallelism }}" -o "./${{ inputs.filename}}"
+        arguments: -log "${{ inputs.log }}" -p "${{ inputs.parallelism }}" -o "./${{ inputs.filename}}" -allow-missing
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
